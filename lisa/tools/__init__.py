@@ -19,13 +19,14 @@ from .lsmod import Lsmod
 from .lspci import Lspci
 from .lsvmbus import Lsvmbus
 from .make import Make
-from .mkfs import Mkfsext, Mkfsxfs
+from .mkfs import Mkfs, Mkfsext, Mkfsxfs
 from .modinfo import Modinfo
 from .mount import Mount
 from .ntp import Ntp
 from .ntpstat import Ntpstat
 from .ntttcp import Ntttcp
 from .nvmecli import Nvmecli
+from .parted import Parted
 from .reboot import Reboot
 from .service import Service
 from .sysctl import Sysctl
@@ -53,6 +54,7 @@ __all__ = [
     "Lspci",
     "Lsvmbus",
     "Make",
+    "Mkfs",
     "Mkfsext",
     "Mkfsxfs",
     "Modinfo",
@@ -61,6 +63,7 @@ __all__ = [
     "Ntpstat",
     "Ntttcp",
     "Nvmecli",
+    "Parted",
     "Reboot",
     "Sed",
     "Uname",
