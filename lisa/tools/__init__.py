@@ -35,6 +35,7 @@ from .taskset import TaskSet
 from .timedatectl import Timedatectl
 from .uptime import Uptime
 from .who import Who
+from .xfstests import Xfstests
 
 __all__ = [
     "Cat",
@@ -75,4 +76,5 @@ __all__ = [
     "Uptime",
     "Wget",
     "Who",
+    "Xfstests",
 ]
