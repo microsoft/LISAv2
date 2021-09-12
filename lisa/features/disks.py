@@ -1,7 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
-from typing import Type
+from typing import List, Type
 
 from lisa import schema
 from lisa.feature import Feature
@@ -18,6 +18,9 @@ class Disk(Feature):
 
     def enabled(self) -> bool:
         return True
+
+    def get_raw_data_disks(self) -> List[str]:
+        raise NotImplementedError
 
 
 DiskEphemeral = schema.DiskOptionSettings(disk_type=schema.DiskType.Ephemeral)
