@@ -2167,6 +2167,7 @@ function install_deb () {
 function apt_get_install () {
 	package_name=$1
 	dpkg_configure
+	CheckInstallLockUbuntu
 	sudo DEBIAN_FRONTEND=noninteractive apt --fix-broken install -y
 	sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --force-yes $package_name
 	check_exit_status "apt_get_install $package_name" "exit"
