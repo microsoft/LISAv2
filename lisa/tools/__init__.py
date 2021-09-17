@@ -14,6 +14,7 @@ from .gcc import Gcc
 from .git import Git
 from .hwclock import Hwclock
 from .kdump import KdumpBase
+from .lsblk import Lsblk
 from .lscpu import Lscpu
 from .lsmod import Lsmod
 from .lspci import Lspci
@@ -29,6 +30,7 @@ from .ntttcp import Ntttcp
 from .nvmecli import Nvmecli
 from .reboot import Reboot
 from .service import Service
+from .swapon import SwapOn
 from .sysctl import Sysctl
 from .tar import Tar
 from .taskset import TaskSet
@@ -49,6 +51,7 @@ __all__ = [
     "Git",
     "Hwclock",
     "KdumpBase",
+    "Lsblk",
     "Lscpu",
     "Lsmod",
     "Lspci",
@@ -67,6 +70,7 @@ __all__ = [
     "Sed",
     "Uname",
     "Service",
+    "SwapOn",
     "Sysctl",
     "Tar",
     "TaskSet",
