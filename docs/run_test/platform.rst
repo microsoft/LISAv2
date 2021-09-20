@@ -7,6 +7,8 @@ Run tests on different platforms
    *  `Use marketplace image <#use-marketplace-image>`__
    *  `Running with existing deployment <#use-existing-deployment>`__
 
+-  `Run on Hyper-V <#run-on-hyper-v>`__
+
 -  `Run on Ready computers <#run-on-ready-computers>`__
 
 Run on Azure
@@ -90,12 +92,23 @@ The remaining steps are same as outlined in
 Running with existing deployment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In addition to deploying a new Azure server and running tests, you can
-skip the deployment phase and use existing resource group.
+In addition to deploying a new Azure server and running tests, you can skip the
+deployment phase and use existing resource group.
 
-The advantage is that it can run all test cases of Azure. The shortage
-is that the VM name is fixed, and it should be node-0, so each resource
-group can put only one VM.
+The advantage is that it can run all test cases of Azure. The shortage is that
+the VM name is fixed, and it should be node-0, so each resource group can put
+only one VM.
+
+Run on Hyper-V
+---------------
+
+LISA uses SSH to communicate with Windows server to operate Hyper-V.
+
+`Enable-SSH.ps1
+<https://github.com/microsoft/lisa/tree/main/microsoft/utils/Enable-SSH.ps1>`_
+is used to enable SSH with key authentication, when use a Windows server in
+first time. Follow below steps to use this script.
+
 
 Run on Ready computers
 ----------------------
