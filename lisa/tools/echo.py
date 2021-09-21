@@ -25,11 +25,15 @@ class Echo(Tool):
         value: str,
         file: str,
         sudo: bool = False,
+        append: bool = False,
         timeout: int = 60,
     ) -> None:
         # Run `echo <value> > <file>`
+        cmd = f"{value} > {file}"
+        if append:
+            cmd = f"{value} >> {file}"
         result = self.run(
-            f"{value} > {file}",
+            cmd,
             force_run=True,
             shell=True,
             sudo=sudo,

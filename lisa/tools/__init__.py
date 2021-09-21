@@ -19,7 +19,7 @@ from .lsmod import Lsmod
 from .lspci import Lspci
 from .lsvmbus import Lsvmbus
 from .make import Make
-from .mkfs import Mkfsext, Mkfsxfs
+from .mkfs import Mkfs, Mkfsext, Mkfsxfs
 from .modinfo import Modinfo
 from .modprobe import Modprobe
 from .mount import Mount
@@ -27,6 +27,7 @@ from .ntp import Ntp
 from .ntpstat import Ntpstat
 from .ntttcp import Ntttcp
 from .nvmecli import Nvmecli
+from .parted import Parted
 from .reboot import Reboot
 from .service import Service
 from .sysctl import Sysctl
@@ -35,6 +36,7 @@ from .taskset import TaskSet
 from .timedatectl import Timedatectl
 from .uptime import Uptime
 from .who import Who
+from .xfstests import Xfstests
 
 __all__ = [
     "Cat",
@@ -54,6 +56,7 @@ __all__ = [
     "Lspci",
     "Lsvmbus",
     "Make",
+    "Mkfs",
     "Mkfsext",
     "Mkfsxfs",
     "Modinfo",
@@ -63,6 +66,7 @@ __all__ = [
     "Ntpstat",
     "Ntttcp",
     "Nvmecli",
+    "Parted",
     "Reboot",
     "Sed",
     "Uname",
@@ -74,4 +78,5 @@ __all__ = [
     "Uptime",
     "Wget",
     "Who",
+    "Xfstests",
 ]
