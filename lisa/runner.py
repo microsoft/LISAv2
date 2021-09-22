@@ -2,6 +2,7 @@
 # Licensed under the MIT license.
 
 import copy
+import time
 from logging import FileHandler
 from pathlib import Path
 from threading import Lock
@@ -15,6 +16,7 @@ from lisa.testsuite import TestResult, TestResultMessage, TestStatus
 from lisa.util import BaseClassMixin, InitializableMixin, LisaException, constants
 from lisa.util.logger import create_file_handler, get_logger, remove_handler
 from lisa.util.parallel import TaskManager, cancel, set_global_task_manager
+from lisa.util.perf_timer import create_timer
 from lisa.util.subclasses import Factory
 from lisa.variable import VariableEntry, get_case_variables, replace_variables
 
@@ -84,6 +86,7 @@ class BaseRunner(BaseClassMixin, InitializableMixin):
         self._log = get_logger("runner", str(index))
         self._log_handler: Optional[FileHandler] = None
         self._case_variables = case_variables
+        self._timer = create_timer()
         self.canceled = False
 
     def __repr__(self) -> str:
@@ -105,6 +108,7 @@ class BaseRunner(BaseClassMixin, InitializableMixin):
         if self._log_handler:
             remove_handler(self._log_handler)
             self._log_handler.close()
+        self._log.debug(f"Runner closed after {self._timer.elapsed()}s.")
 
     def _initialize(self, *args: Any, **kwargs: Any) -> None:
         # do not put this logic to __init__, since the mkdir takes time.
@@ -283,7 +287,7 @@ class RootRunner(Action):
                 )
 
                 for runner in remaining_runners:
-                    while not runner.is_done:
+                    while not runner.is_done and has_idle_worker:
                         # fetch a task and submit
                         task = runner.fetch_task()
                         if task:
@@ -302,10 +306,11 @@ class RootRunner(Action):
                             # current runner may not be done, but it doesn't
                             # have task temporarily. The root runner can start
                             # tasks from next runner.
+                            self._log.debug(
+                                f"No task available for runner : {runner.id}"
+                            )
                             break
-                        if not task_manager.has_idle_worker():
-                            has_idle_worker = False
-                            break
+                        has_idle_worker = task_manager.has_idle_worker()
                     if runner.is_done:
                         # remove fully completed runner.
                         runner.close()
@@ -322,12 +327,14 @@ class RootRunner(Action):
                         # previous runner firstly in next run.
                         break
 
-                while (
-                    len(remaining_runners) < self._max_concurrency and has_more_runner
-                ):
-                    # Fetch runners, if runner count is smaller than concurrency
-                    # count. It makes sure all concurrency can run.
-                    try:
-                        remaining_runners.append(next(runner_iterator))
-                    except StopIteration:
-                        has_more_runner = False
+                if has_idle_worker:
+                    if has_more_runner:
+                        # Add new runner if idle workers are available.
+                        try:
+                            remaining_runners.append(next(runner_iterator))
+                        except StopIteration:
+                            has_more_runner = False
+                    else:
+                        # Reduce CPU utilization from infinite loop when idle
+                        # workers are present but no task to run.
+                        time.sleep(1)
