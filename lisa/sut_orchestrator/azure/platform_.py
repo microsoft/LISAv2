@@ -75,6 +75,7 @@ from .common import (
     get_or_create_storage_container,
     get_resource_management_client,
     get_storage_account_name,
+    global_credential_access_lock,
     wait_copy_blob,
     wait_operation,
 )
@@ -549,8 +550,8 @@ class AzurePlatform(Platform):
                 delete_operation = self._rm_client.resource_groups.begin_delete(
                     resource_group_name
                 )
-            except Exception as identifer:
-                log.debug(f"exception on delete resource group: {identifer}")
+            except Exception as identifier:
+                log.debug(f"exception on delete resource group: {identifier}")
             if delete_operation and self._azure_runbook.wait_delete:
                 result = wait_operation(delete_operation)
                 if result:
@@ -1091,9 +1092,10 @@ class AzurePlatform(Platform):
 
         validate_operation: Any = None
         try:
-            validate_operation = self._rm_client.deployments.begin_validate(
-                **deployment_parameters
-            )
+            with global_credential_access_lock:
+                validate_operation = self._rm_client.deployments.begin_validate(
+                    **deployment_parameters
+                )
             result = wait_operation(validate_operation)
             if result:
                 raise LisaException(f"validation failed: {result}")
@@ -1478,12 +1480,13 @@ class AzurePlatform(Platform):
             marketplace_client = get_marketplace_ordering_client(self)
             term: Optional[AgreementTerms] = None
             try:
-                term = marketplace_client.marketplace_agreements.get(
-                    offer_type="virtualmachine",
-                    publisher_id=marketplace.publisher,
-                    offer_id=marketplace.offer,
-                    plan_id=image_info.plan.name,
-                )
+                with global_credential_access_lock:
+                    term = marketplace_client.marketplace_agreements.get(
+                        offer_type="virtualmachine",
+                        publisher_id=marketplace.publisher,
+                        offer_id=marketplace.offer,
+                        plan_id=image_info.plan.name,
+                    )
             except Exception as identifier:
                 raise LisaException(
                     f"error on getting marketplace agreement: {identifier}"
