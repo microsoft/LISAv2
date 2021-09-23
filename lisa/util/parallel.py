@@ -2,7 +2,9 @@
 # Licensed under the MIT license.
 
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from typing import Any, Callable, Generic, List, Optional, TypeVar
+from typing import Any, Callable, Dict, Generic, List, Optional, TypeVar
+
+from lisa.util.logger import get_logger
 
 from . import LisaException
 
@@ -11,11 +13,13 @@ T_RESULT = TypeVar("T_RESULT")
 
 class TaskManager(Generic[T_RESULT]):
     def __init__(self, max_workers: int, callback: Callable[[T_RESULT], None]) -> None:
+        self._log = get_logger("TaskManager")
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._max_workers = max_workers
         self._futures: List[Future[T_RESULT]] = []
         self._callback = callback
         self._cancelled = False
+        self._future_task_map: Dict[Future[T_RESULT], Callable[[], T_RESULT]] = {}
 
     def __enter__(self) -> Any:
         return self._pool.__enter__()
@@ -25,7 +29,9 @@ class TaskManager(Generic[T_RESULT]):
 
     def submit_task(self, task: Callable[[], T_RESULT]) -> None:
         future: Future[T_RESULT] = self._pool.submit(task)
+        self._future_task_map[future] = task
         self._futures.append(future)
+        self._log.debug(f"Started task : {task}")
 
     def cancel(self) -> None:
         self._cancelled = True
@@ -51,6 +57,7 @@ class TaskManager(Generic[T_RESULT]):
             self._futures.remove(future)
             # exception will throw at this point
             self._callback(result)
+            self._log.debug(f"End task : {self._future_task_map[future]}")
         return len(self._futures) > 0
 
 
