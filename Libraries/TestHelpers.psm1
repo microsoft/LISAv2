@@ -86,14 +86,15 @@ function Upload-RemoteFile($uploadTo, $port, $file, $username, $password, $usePr
 	while ($retry -le $maxRetry) {
 		$pscpStuckTimeoutInSeconds = New-Timespan -Seconds 540
 		$retryTimeoutInSeconds = New-Timespan -Seconds 600
-		Write-LogDbg "Uploading $file to $username : $uploadTo, port $port using PrivateKey authentication"
 		$uploadStatusRandomFileName = "UploadStatusFile" + (Get-Random -Maximum 9999 -Minimum 1111) + ".txt"
 		$uploadStatusRandomFile = Join-Path $env:TEMP $uploadStatusRandomFileName
 		if ($global:sshPrivateKey) {
+			Write-LogDbg "Uploading $file to $username : $uploadTo, port $port using PrivateKey authentication"
 			$usePrivateKey = $true
 			$credential = $global:sshPrivateKey
 		}
 		else {
+			Write-LogDbg "Uploading $file to $username : $uploadTo, port $port using password authentication"
 			$usePrivateKey = $false
 			$credential = $password
 		}
