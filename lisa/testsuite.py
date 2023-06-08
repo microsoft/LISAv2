@@ -590,7 +590,7 @@ class TestSuite:
                 suite_error_message,
                 suite_error_stacktrace,
             ) = self.__suite_method(
-                self.before_suite,  # type: ignore
+                self.before_suite,
                 test_kwargs=test_kwargs,
                 log=suite_log,
             )
@@ -672,7 +672,7 @@ class TestSuite:
 
         if hasattr(self, "after_suite"):
             self.__suite_method(
-                self.after_suite,  # type: ignore
+                self.after_suite,
                 test_kwargs=test_kwargs,
                 log=suite_log,
             )
