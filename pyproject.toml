@@ -68,7 +68,7 @@ ado = [
 ]
 
 black = [
-    "black ~= 23.1.0",
+    "black ~= 24.10.0",
 ]
 
 docs = [
