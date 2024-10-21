@@ -89,7 +89,7 @@ flake8 = [
 ]
 
 isort = [
-    "isort ~= 5.12.0",
+    "isort ~= 5.13.2",
 ]
 
 legacy = [
