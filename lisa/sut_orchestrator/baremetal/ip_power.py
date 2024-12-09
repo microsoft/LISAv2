@@ -35,7 +35,7 @@ class Ip9285(IPPower):
     def __init__(self, runbook: IPPowerSchema) -> None:
         super().__init__(runbook)
         self._request_cmd = (
-            f"http://{runbook.host}/set.cmd?"
+            f"http://{runbook.hostname}/set.cmd?"
             f"user={runbook.username}+pass="
             f"{runbook.password}+cmd=setpower+P6"
         )
