@@ -68,6 +68,30 @@ class KeyLoaderSchema(schema.TypedSchema, schema.ExtendableSchemaMixin):
 
 @dataclass_json()
 @dataclass
+class BootConfigSchema(schema.TypedSchema, schema.ExtendableSchemaMixin):
+    type: str = field(default="boot_config", metadata=field_metadata(required=True))
+
+
+@dataclass_json()
+@dataclass
+class IPPowerSchema(schema.TypedSchema, schema.ExtendableSchemaMixin):
+    host: str = ""
+    username: str = ""
+    password: str = ""
+
+    def __post_init__(self, *args: Any, **kwargs: Any) -> None:
+        add_secret(self.password)
+
+
+@dataclass_json()
+@dataclass
+class Ip9285(IPPowerSchema):
+    type: str = "Ip9285"
+    ctl_port: str = ""
+
+
+@dataclass_json()
+@dataclass
 class ClusterSchema(schema.TypedSchema, schema.ExtendableSchemaMixin):
     type: str = field(default="rackmanager", metadata=field_metadata(required=True))
     build: Optional[BuildSchema] = None
@@ -207,6 +231,7 @@ class PxeClient(ClientSchema):
 class PxeCluster(ClusterSchema):
     type: str = "pxe"
     serial_console: Optional[SerialConsoleServer] = field(default=None)
+    start_stop: Optional[IPPowerSchema] = field(default=None)
     client: List[PxeClient] = field(default_factory=list)
 
 

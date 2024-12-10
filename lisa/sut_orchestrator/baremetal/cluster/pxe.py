@@ -4,9 +4,11 @@
 from pathlib import Path
 from typing import Any, Optional, Type, cast
 
+import requests
+
 from lisa import features
 from lisa.environment import Environment
-from lisa.features.serial_console import SerialConsole
+from lisa.features import SerialConsole, StartStop
 from lisa.node import Node, RemoteNode, quick_connect
 from lisa.platform_ import Platform
 from lisa.schema import FeatureSettings
@@ -16,6 +18,8 @@ from lisa.util.logger import Logger
 from .. import schema
 from ..context import get_node_context
 from .cluster import Cluster
+
+REQUEST_TIMEOUT = 3
 
 
 class RemoteComSerialConsole(features.SerialConsole):
@@ -103,6 +107,56 @@ class RemoteComSerialConsole(features.SerialConsole):
         self._log.debug("connected to serial console: {serial_port}")
 
 
+class Ip9285StartStop(features.StartStop):
+    def __init__(
+        self, settings: FeatureSettings, node: Node, platform: Platform
+    ) -> None:
+        super().__init__(settings, node, platform)
+
+    def _initialize(self, *args: Any, **kwargs: Any) -> None:
+        super()._initialize(*args, **kwargs)
+
+        context = get_node_context(self._node)
+        pxe_cluster = cast(schema.PxeCluster, context.cluster)
+        assert pxe_cluster.start_stop, "start_stop is not defined"
+
+        ip_power_runbook = pxe_cluster.start_stop.get_extended_runbook(schema.Ip9285)
+
+        self._request_cmd = (
+            f"http://{ip_power_runbook.host}/set.cmd?"
+            f"user={ip_power_runbook.username}+pass="
+            f"{ip_power_runbook.password}+cmd="
+            f"setpower+P6{ip_power_runbook.ctl_port}"
+        )
+
+    def _set_ip_power(self, power_cmd: str) -> None:
+        try:
+            response = requests.get(power_cmd, timeout=REQUEST_TIMEOUT)
+            response.raise_for_status()
+        except requests.HTTPError as http_err:
+            raise LisaException(f"HTTP error: {http_err} occurred in set_ip_power")
+        except Exception as err:
+            raise LisaException(f"Other Error: {err} occurred in set_ip_power")
+        else:
+            self._log.debug(f"Command {power_cmd} done in set_ip_power")
+
+    def _stop(
+        self,
+        wait: bool = True,
+        state: features.StopState = features.StopState.Shutdown,
+    ) -> None:
+        request_off = f"{self._request_cmd}=0"
+        self._set_ip_power(request_off)
+
+    def _start(self, wait: bool = True) -> None:
+        request_on = f"{self._request_cmd}=1"
+        self._set_ip_power(request_on)
+
+    def _restart(self, wait: bool = True) -> None:
+        self._stop()
+        self._start()
+
+
 class Pxe(Cluster):
     def __init__(self, runbook: schema.ClusterSchema, **kwargs: Any) -> None:
         super().__init__(runbook, **kwargs)
@@ -126,11 +180,21 @@ class Pxe(Cluster):
                 f"is not supported."
             )
 
+    def get_start_stop(self) -> Type[StartStop]:
+        assert self.runbook.start_stop, "start_stop is not defined"
+        if self.runbook.start_stop.type == "Ip9285":
+            return Ip9285StartStop
+        else:
+            raise NotImplementedError(
+                f"start_stop type {self.runbook.start_stop.type} " f"is not supported."
+            )
+
     def deploy(self, environment: Environment) -> Any:
         # connect to serial console
         for node in environment.nodes.list():
             # start serial console to save all log
             _ = node.features[features.SerialConsole]
+            _ = node.features[features.StartStop]
 
     def delete(self, environment: Environment, log: Logger) -> None:
         for node in environment.nodes.list():
