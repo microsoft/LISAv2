@@ -1,6 +1,11 @@
 from typing import Any, List, Optional
 
-from lisa.sut_orchestrator.util.schema import HostDevicePoolSchema, HostDevicePoolType
+from lisa.sut_orchestrator.util.schema import (
+    HostDevicePoolSchema,
+    HostDevicePoolType,
+    PciAddressIdentifier,
+    VendorDeviceIdIdentifier,
+)
 from lisa.util import LisaException
 
 
@@ -13,6 +18,13 @@ class BaseDevicePool:
         pool_type: HostDevicePoolType,
         vendor_id: str,
         device_id: str,
+    ) -> None:
+        raise NotImplementedError()
+
+    def create_device_pool_from_pci_addresses(
+        self,
+        pool_type: HostDevicePoolType,
+        pci_addr_list: List[str],
     ) -> None:
         raise NotImplementedError()
 
@@ -44,22 +56,37 @@ class BaseDevicePool:
                         f"Pool type '{pool_type}' is not supported by platform"
                     )
             for config in device_configs:
-                vendor_device_list = config.devices
-                if len(vendor_device_list) > 1:
-                    raise LisaException(
-                        "Device Pool does not support more than one "
-                        "vendor/device id list for given pool type"
+                device_list = config.devices
+                if (
+                    isinstance(device_list, list) and
+                    all(isinstance(d, VendorDeviceIdIdentifier) for d in device_list)
+                ):
+                    if len(device_list) > 1:
+                        raise LisaException(
+                            "Device Pool does not support more than one "
+                            "vendor/device id list for given pool type"
+                        )
+
+                    vendor_device_id = device_list[0]
+                    assert vendor_device_id.vendor_id.strip()
+                    vendor_id = vendor_device_id.vendor_id.strip()
+
+                    assert vendor_device_id.device_id.strip()
+                    device_id = vendor_device_id.device_id.strip()
+
+                    self.create_device_pool(
+                        pool_type=config.type,
+                        vendor_id=vendor_id,
+                        device_id=device_id,
                     )
-
-                vendor_device_id = vendor_device_list[0]
-                assert vendor_device_id.vendor_id.strip()
-                vendor_id = vendor_device_id.vendor_id.strip()
-
-                assert vendor_device_id.device_id.strip()
-                device_id = vendor_device_id.device_id.strip()
-
-                self.create_device_pool(
-                    pool_type=config.type,
-                    vendor_id=vendor_id,
-                    device_id=device_id,
-                )
+                elif isinstance(device_list, dict) and device_list.get("pci_bdf"):
+                    # Create pool from the list of PCI addresses
+                    self.create_device_pool_from_pci_addresses(
+                        pool_type=config.type,
+                        pci_addr_list=device_list.get("pci_bdf"),
+                    )
+                else:
+                    raise LisaException(
+                        f"Unknown device identifier of type: {type(device_list)}"
+                        f", value: {device_list}"
+                    )

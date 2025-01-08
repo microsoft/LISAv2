@@ -81,6 +81,9 @@ class NodeContext:
         default_factory=list,
     )
 
+    # Add host detail under node context for device-passthrough testcases
+    host_node: Any = None
+
 
 def get_environment_context(environment: Environment) -> EnvironmentContext:
     return environment.get_context(EnvironmentContext)

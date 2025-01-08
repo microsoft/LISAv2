@@ -48,6 +48,16 @@ class DeviceAddressSchema:
     slot: str = ""
     function: str = ""
 
+    def __eq__(self, other):
+        if isinstance(other, DeviceAddressSchema):
+            return (
+                self.domain == other.domain and
+                self.bus == other.bus and
+                self.slot == other.slot and
+                self.function == other.function
+            )
+        return False
+
 
 # QEMU orchestrator's global configuration options.
 @dataclass_json()
