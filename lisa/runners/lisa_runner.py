@@ -616,12 +616,15 @@ class LisaRunner(BaseRunner):
         # so deployment failure can be tracked.
         environment.platform = self.platform
         result.environment = environment
+
+        result.subscribe_log(self._log)
         result.handle_exception(exception=exception, log=self._log, phase="deployment")
         self._log.info(
             f"'{environment.name}' attached to test case "
             f"'{result.runtime_data.metadata.full_name}({result.id_})': "
             f"{exception}"
         )
+        result.unsubscribe_log(self._log)
         # release environment reference to optimize memory.
         result.environment = None
 
