@@ -233,13 +233,24 @@ class Kselftest(Tool):
 
         result_file_name = "kselftest-results.txt"
         result_file = f"{result_directory}/{result_file_name}"
-        self.run(
-            f" 2>&1 | tee {result_file}",
-            sudo=run_test_as_root,
-            force_run=True,
-            shell=True,
-            timeout=timeout,
-        )
+
+        if self._tar_file_path:
+            self.run(
+                f" 2>&1 | tee {result_file}",
+                cwd=PurePosixPath(self._kself_installed_dir),
+                sudo=run_test_as_root,
+                force_run=True,
+                shell=True,
+                timeout=timeout,
+            )
+        else:
+            self.run(
+                f" 2>&1 | tee {result_file}",
+                sudo=run_test_as_root,
+                force_run=True,
+                shell=True,
+                timeout=timeout,
+            )
 
         # Allow read permissions for "others" to remote copy the file
         # kselftest-results.txt
