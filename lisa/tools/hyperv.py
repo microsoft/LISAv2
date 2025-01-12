@@ -400,8 +400,6 @@ class HyperV(Tool):
     # with internal NAT switch.
     # Do not use this method in Hyper-V hosts on LAN or other networks where DHCP
     # server is already available.
-    # This method will configure the DHCP server on the Hyper-V host to provide IP
-    # addresses to VMs.
     # Reference doc:
     # https://techcommunity.microsoft.com/blog/itopstalkblog/how-to-setup-nested-virtualization-for-azure-vmvhd/1115338  # noqa
     def configure_dhcp(self, dhcp_scope_name: str = "DHCPInternalNAT") -> None:
