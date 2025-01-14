@@ -402,7 +402,7 @@ class HyperV(Tool):
     # server is already available.
     # Reference doc:
     # https://techcommunity.microsoft.com/blog/itopstalkblog/how-to-setup-nested-virtualization-for-azure-vmvhd/1115338  # noqa
-    def configure_dhcp(self, dhcp_scope_name: str = "DHCPInternalNAT") -> None:
+    def enable_internal_dhcp(self, dhcp_scope_name: str = "DHCPInternalNAT") -> None:
         powershell = self.node.tools[PowerShell]
         service: Service = self.node.tools[Service]
 
