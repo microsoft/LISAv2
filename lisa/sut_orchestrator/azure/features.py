@@ -97,6 +97,7 @@ from .common import (
     AzureCapability,
     AzureImageSchema,
     AzureNodeSchema,
+    DiskPlacementType,
     check_or_create_storage_account,
     create_update_private_dns_zone_groups,
     create_update_private_endpoints,
@@ -112,6 +113,7 @@ from .common import (
     delete_virtual_network_links,
     find_by_name,
     get_compute_client,
+    get_disk_placement_priority,
     get_network_client,
     get_node_context,
     get_or_create_file_share,
@@ -1307,6 +1309,31 @@ _disk_size_performance_map: Dict[schema.DiskType, List[Tuple[int, int, int]]] = 
 @dataclass()
 class AzureDiskOptionSettings(schema.DiskOptionSettings):
     has_resource_disk: Optional[bool] = None
+    ephemeral_disk_placement_type: Optional[
+        Union[search_space.SetSpace[DiskPlacementType], DiskPlacementType]
+    ] = field(  # type:ignore
+        default_factory=partial(
+            search_space.SetSpace,
+            items=[
+                DiskPlacementType.NONE,
+                DiskPlacementType.RESOURCE,
+                DiskPlacementType.CACHE,
+                DiskPlacementType.NVME,
+            ],
+        ),
+        metadata=field_metadata(
+            decoder=partial(
+                search_space.decode_nullable_set_space,
+                base_type=DiskPlacementType,
+                default_values=[
+                    DiskPlacementType.NONE,
+                    DiskPlacementType.RESOURCE,
+                    DiskPlacementType.CACHE,
+                    DiskPlacementType.NVME,
+                ],
+            )
+        ),
+    )
 
     def __hash__(self) -> int:
         return super().__hash__()
@@ -1372,6 +1399,13 @@ class AzureDiskOptionSettings(schema.DiskOptionSettings):
                 self.has_resource_disk, capability.has_resource_disk
             ),
             "has_resource_disk",
+        )
+        result.merge(
+            search_space.check_setspace(
+                self.ephemeral_disk_placement_type,
+                capability.ephemeral_disk_placement_type,
+            ),
+            "ephemeral_disk_placement_type",
         )
         result.merge(
             search_space.check_countspace(
@@ -1474,6 +1508,34 @@ class AzureDiskOptionSettings(schema.DiskOptionSettings):
             capability.disk_controller_type,
             schema.disk_controller_type_priority,
         )
+
+        # refer
+        # https://learn.microsoft.com/en-us/powershell/module/az.compute/set-azvmssstorageprofile?view=azps-13.0.0               # noqa: E501
+        # https://github.com/MicrosoftDocs/azure-compute-docs/blob/main/articles/virtual-machines/ephemeral-os-disks-faq.md      # noqa: E501
+        if value.os_disk_type == schema.DiskType.Ephemeral:
+            cap_ephemeral_disk_placement_type = capability.ephemeral_disk_placement_type
+            if isinstance(cap_ephemeral_disk_placement_type, search_space.SetSpace):
+                assert len(cap_ephemeral_disk_placement_type) > 0, (
+                    "capability should have at least one ephemeral disk placement type,"
+                    " but it's empty"
+                )
+            elif isinstance(cap_ephemeral_disk_placement_type, DiskPlacementType):
+                cap_ephemeral_disk_placement_type = search_space.SetSpace[
+                    DiskPlacementType
+                ](is_allow_set=True, items=[cap_ephemeral_disk_placement_type])
+            else:
+                raise LisaException(
+                    "unknown ephemeral disk placement type "
+                    f"on capability, type: {cap_ephemeral_disk_placement_type}"
+                )
+
+            value.ephemeral_disk_placement_type = getattr(
+                search_space, f"{method.value}_setspace_by_priority"
+            )(
+                self.ephemeral_disk_placement_type,
+                capability.ephemeral_disk_placement_type,
+                get_disk_placement_priority(),
+            )
 
         # below values affect data disk only.
         if self.data_disk_count is not None or capability.data_disk_count is not None:
@@ -2018,6 +2080,11 @@ class Disk(AzureFeatureMixin, features.Disk):
         ]
 
         return data_disks
+
+    def get_ephemeral_disk_placement_type(self) -> Any:
+        azure_platform: AzurePlatform = self._platform  # type: ignore
+        vm = get_vm(azure_platform, self._node)
+        return vm.storage_profile.os_disk.diff_disk_settings.placement
 
 
 def get_azure_disk_type(disk_type: schema.DiskType) -> str:

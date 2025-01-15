@@ -6,7 +6,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.32.4.45862",
-      "templateHash": "16398577375970436728"
+      "templateHash": "17292510441982444978"
     }
   },
   "functions": [
@@ -113,7 +113,7 @@
               "name": "[format('{0}-osDisk', parameters('node').name)]",
               "diffDiskSettings": {
                 "option": "local",
-                "placement": "[parameters('node').ephemeral.ephemeral_disk_placement_type]"
+                "placement": "[parameters('node').disk.ephemeral_disk_placement_type]"
               },
               "caching": "ReadOnly",
               "createOption": "FromImage",
