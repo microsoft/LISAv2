@@ -8,7 +8,7 @@ from lisa import feature, schema, search_space
 from lisa.environment import Environment
 from lisa.node import RemoteNode
 from lisa.platform_ import Platform
-from lisa.tools import Cp, HyperV, Mkdir, PowerShell
+from lisa.tools import Cp, HyperV, Mkdir, Mount, PowerShell
 from lisa.util import LisaException, constants
 from lisa.util.logger import Logger, get_logger
 from lisa.util.parallel import run_in_parallel
@@ -315,6 +315,8 @@ class HypervPlatform(Platform):
                 address=ip_addr, username=username, password=password
             )
 
+            self._expand_root_partition(node)
+
     def _resize_vhd_if_needed(
         self, vhd_path: PurePath, node_runbook: HypervNodeSchema
     ) -> None:
@@ -325,6 +327,23 @@ class HypervPlatform(Platform):
                 f"Resize-VHD -Path {vhd_path} "
                 f"-SizeBytes {node_runbook.osdisk_size_in_gb * 1024 * 1024 * 1024}"
             )
+
+    def _expand_root_partition(self, node: RemoteNode) -> None:
+        # Get the root partition info
+        root_partition = node.tools[Mount].get_partition_info("/")[0]
+        device_name = root_partition.name
+        partition = root_partition.disk
+        root_part_num = device_name[-1]
+        # Grow the partition and resize the filesystem
+        cmd_result = node.execute(
+            f"growpart /dev/{partition} {root_part_num}", sudo=True
+        )
+        # In case, the partition is already expanded to full disk size, the
+        # command will print "NOCHANGE: partition 2 is size <size>. it cannot
+        # be grown". In this case, it returns exit code 1 which we can ignore
+        if cmd_result.exit_code != 0 and "NOCHANGE" not in cmd_result.stdout:
+            raise LisaException(f"Failed to grow partition: {cmd_result.stdout}")
+        node.execute(f"resize2fs {device_name}", sudo=True)
 
     def _delete_environment(self, environment: Environment, log: Logger) -> None:
         self._delete_nodes(environment, log)
