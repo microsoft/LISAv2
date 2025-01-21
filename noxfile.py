@@ -3,6 +3,7 @@ Nox configuration file
 See https://nox.thea.codes/en/stable/config.html
 """
 
+import logging
 import platform
 import sys
 from pathlib import Path
@@ -27,7 +28,48 @@ nox.options.error_on_missing_interpreters = False
 nox.needs_version = ">=2022.8.7"
 
 
+# Custom logging handler to split logs based on level
+class SplitStreamHandler(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.levelno >= logging.ERROR:
+            stream = sys.stderr
+            prefix = "[STDERR]"
+        else:
+            stream = sys.stdout
+            prefix = "[STDOUT]"
+
+        message = self.format(record)
+        formatted_message = f"{prefix} {message}"
+        stream.write(formatted_message + "\n")
+
+
+# Configure logging
+def configure_logging():
+    logger = logging.getLogger()
+    logger.setLevel(
+        logging.DEBUG
+    )  # Set the lowest logging level to capture all messages
+
+    # Remove existing handlers
+    for handler in logger.handlers[:]:
+        logger.removeHandler(handler)
+
+    # Add the custom handler
+    handler = SplitStreamHandler()
+    handler.setFormatter(logging.Formatter("%(levelname)s: %(message)s"))
+    logger.addHandler(handler)
+
+
+# Apply the logging configuration
+configure_logging()
+
+
 # --- Testing ---
+@nox.session
+def test_log(session: nox.Session) -> None:
+    session.log("This is an INFO log.")  # Goes to stdout
+    logging.warning("This is a WARNING log.")  # Goes to stdout
+    logging.error("This is an ERROR log.")  # Goes to stderr
 
 
 @nox.session(python=CURRENT_PYTHON, tags=["test", "all"])
