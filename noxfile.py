@@ -204,6 +204,10 @@ def dev(session: nox.Session) -> None:
         nox -vs dev -- libvirt
     """
 
+    session.log("--- paxue debug: This is an INFO log.")  # Goes to stdout
+    logging.warning("--- paxue warn: This is a WARNING log.")  # Goes to stdout
+    logging.error("--- paxue Error: This is an ERROR log.")  # Goes to stderr
+
     # Determine which extra dependencies to install
     if session.posargs:
         for arg in session.posargs:
