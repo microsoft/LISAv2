@@ -404,13 +404,27 @@ class Posix(OperatingSystem, BaseClassMixin):
         package_names = self._get_package_list(packages)
         self._uninstall_packages(package_names, signed, timeout, extra_args)
 
-    def package_exists(self, package: Union[str, Tool, Type[Tool]]) -> bool:
+    def package_exists(
+        self,
+        package: Union[str, Tool, Type[Tool]],
+        minimum_version: Optional[VersionInfo] = None,
+    ) -> bool:
         """
         Query if a package/tool is installed on the node.
         Return Value - bool
         """
         package_name = self.__resolve_package_name(package)
-        return self._package_exists(package_name)
+        exists = self._package_exists(package_name)
+        self._log.debug(f"package '{package}' exists: {exists}")
+        if minimum_version is None or not exists:
+            return exists
+
+        actual_version = self.get_package_information(package_name=package_name)
+        self._log.debug(
+            f"package '{package}' expected min version: "
+            f"{str(minimum_version)}, actual version: {str(actual_version)}"
+        )
+        return actual_version >= minimum_version
 
     def is_package_in_repo(self, package: Union[str, Tool, Type[Tool]]) -> bool:
         """
@@ -2093,6 +2107,30 @@ class Suse(Linux):
                 self._node.os,
                 "There are no enabled repositories defined in this image.",
             )
+
+    def _uninstall_packages(
+        self,
+        packages: List[str],
+        signed: bool = True,
+        timeout: int = 600,
+        extra_args: Optional[List[str]] = None,
+    ) -> None:
+        add_args = self._process_extra_package_args(extra_args)
+        command = f"zypper --non-interactive {add_args}"
+        if not signed:
+            command += " --no-gpg-checks "
+        remove_packages = " ".join(packages)
+        command += f" rm {remove_packages}"
+        self.wait_running_process("zypper")
+        install_result = self._node.execute(
+            command, shell=True, sudo=True, timeout=timeout
+        )
+        assert_that(install_result.exit_code).described_as(
+            f"Failed to remove {remove_packages}. "
+            f"exit_code: {install_result.exit_code}, "
+            f"stderr: {install_result.stderr}"
+        ).is_equal_to(0)
+        self._log.debug(f"{packages} is/are removed successfully.")
 
     def _install_packages(
         self,
