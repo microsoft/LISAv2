@@ -119,6 +119,12 @@ class KernelInformation:
     version_parts: List[str]
 
 
+@dataclass
+class PackageInformation:
+    name: str
+    version_str: str
+
+
 class OperatingSystem:
     __lsb_release_pattern = re.compile(r"^Description:[ \t]+([\w]+)[ ]+$", re.M)
     # NAME="Oracle Linux Server"
@@ -500,6 +506,9 @@ class Posix(OperatingSystem, BaseClassMixin):
             return found
         return self._get_package_information(package_name)
 
+    def query_package(self, package_name: str) -> PackageInformation:
+        return self._query_package(package_name)
+
     def get_repositories(self) -> List[RepositoryInfo]:
         raise NotImplementedError("get_repositories is not implemented")
 
@@ -550,6 +559,9 @@ class Posix(OperatingSystem, BaseClassMixin):
         pass
 
     def _get_package_information(self, package_name: str) -> VersionInfo:
+        raise NotImplementedError()
+
+    def _query_package(self, package_name: str) -> PackageInformation:
         raise NotImplementedError()
 
     def _get_version_info_from_named_regex_match(
@@ -866,6 +878,17 @@ class Debian(Linux):
             package_name, match
         )
         return self._cache_and_return_version_info(package_name, version_info)
+
+    def _query_package(self, package_name: str) -> PackageInformation:
+        query_result = self._node.execute(
+            f"dpkg-query -f '${{Version}}' -W {package_name}",
+            expected_exit_code=0,
+            expected_exit_code_failure_message=(
+                f"Could not find package information for package {package_name}"
+            ),
+        )
+        version_str = query_result.stdout.strip()
+        return PackageInformation(name=package_name, version_str=version_str)
 
     def add_azure_core_repo(
         self, repo_name: Optional[AzureCoreRepo] = None, code_name: Optional[str] = None
@@ -1557,6 +1580,17 @@ class RPMDistro(Linux):
         )
         return self._cache_and_return_version_info(package_name, version_info)
 
+    def _query_package(self, package_name: str) -> PackageInformation:
+        query_result = self._node.execute(
+            f"rpm --queryformat '%{{VERSION}}-%{{RELEASE}}' -q {package_name}",
+            expected_exit_code=0,
+            expected_exit_code_failure_message=(
+                f"Could not find package information for package {package_name}"
+            ),
+        )
+        version_str = query_result.stdout.strip()
+        return PackageInformation(name=package_name, version_str=version_str)
+
     def _install_packages(
         self,
         packages: List[str],
@@ -2168,6 +2202,17 @@ class Suse(Linux):
             package_name, match
         )
         return self._cache_and_return_version_info(package_name, version_info)
+
+    def _query_package(self, package_name: str) -> PackageInformation:
+        query_result = self._node.execute(
+            f"rpm --queryformat '%{{VERSION}}-%{{RELEASE}}' -q {package_name}",
+            expected_exit_code=0,
+            expected_exit_code_failure_message=(
+                f"Could not find package information for package {package_name}"
+            ),
+        )
+        version_str = query_result.stdout.strip()
+        return PackageInformation(name=package_name, version_str=version_str)
 
 
 class SLES(Suse):
