@@ -1,0 +1,176 @@
+# Copyright (c) Microsoft Corporation.
+# Licensed under the MIT license.
+
+from pathlib import Path
+from typing import Any, List, cast
+
+from assertpy.assertpy import assert_that, assert_warn
+
+from lisa import (
+    Environment,
+    Logger,
+    Node,
+    RemoteNode,
+    TestCaseMetadata,
+    TestSuite,
+    TestSuiteMetadata,
+)
+from lisa.features.security_profile import (
+    CvmEnabled,
+    SecurityProfile,
+    SecurityProfileSettings,
+)
+from lisa.operating_system import CBLMariner, Posix
+from lisa.sut_orchestrator import AZURE
+from lisa.testsuite import TestResult, simple_requirement
+from lisa.tools import Lsblk, Reboot, Tpm2
+from lisa.tools.lsblk import PartitionInfo
+from lisa.util import (
+    SkippedException,
+    TcpConnectionException,
+    UnsupportedDistroException,
+    constants,
+)
+from lisa.util.shell import wait_tcp_port_ready
+
+
+@TestSuiteMetadata(
+    area="cvm",
+    category="functional",
+    description="""This test suite covers some common scenarios related to
+    CVM boot on Azure.
+    """,
+)
+class CVMBootTestSuite(TestSuite):
+    def before_case(self, log: Logger, **kwargs: Any) -> None:
+        node: Node = kwargs["node"]
+        if not isinstance(node.os, CBLMariner):
+            raise SkippedException(
+                UnsupportedDistroException(
+                    node.os, "CVM boot test supports only Azure Linux."
+                )
+            )
+
+    @TestCaseMetadata(
+        description="""This test verifies that TPM enrollment is done correctly on
+        a CVM with encrypted root partition
+        """,
+        priority=2,
+        requirement=simple_requirement(
+            supported_features=[CvmEnabled()],
+            supported_platform_type=[AZURE],
+        ),
+    )
+    def verify_encrypted_root_partition(
+        self,
+        log: Logger,
+        node: RemoteNode,
+        environment: Environment,
+        log_path: Path,
+        result: TestResult,
+    ) -> None:
+        security_profile_settings = cast(
+            SecurityProfileSettings, node.features[SecurityProfile].get_settings()
+        )
+        if not security_profile_settings.encrypt_disk:
+            raise SkippedException("This test requires disk encryption to be enabled")
+        lsblk = node.tools[Lsblk]
+        disks = lsblk.get_disks(force_run=True)
+        partitions: List[PartitionInfo] = next(
+            (d.partitions for d in disks if d.name == "sda"), []
+        )
+        assert_that(partitions, "Cannot find a disk named 'sda'").is_not_empty()
+        root_partition = next((p for p in partitions if p.name == "sda2"), None)
+        assert_that(root_partition, "Cannot locate root partition").is_not_none()
+        assert isinstance(root_partition, PartitionInfo)
+        assert_that(root_partition.fstype).is_equal_to("crypto_LUKS")
+
+    @TestCaseMetadata(
+        description="""This test case verifies that a CVM can still boot if any boot
+        component is upgraded.
+
+        Steps:
+        1. On first boot, check current PCR values for PCR4 and PCR7
+        2. Get current boot components versions (e.g. shim, grub, systemd-boot, uki)
+        3. Run a package upgrade to update boot components
+        4. Get new boot components versions to see if anything has changed
+        5. Reboot the CVM, make sure the CVM can boot up again
+        6. PCR4 should change if any of the boot components is upgraded
+        7. PCR7 may change (for example, if a signing certificate is changed)
+        """,
+        priority=1,
+        requirement=simple_requirement(
+            supported_features=[CvmEnabled()],
+            supported_platform_type=[AZURE],
+        ),
+    )
+    def verify_boot_success_after_component_upgrade(
+        self,
+        log: Logger,
+        node: RemoteNode,
+        environment: Environment,
+        log_path: Path,
+        result: TestResult,
+        **kwargs: Any,
+    ) -> None:
+        posix_os: Posix = cast(Posix, node.os)
+        # First boot
+        # - Check PCR values (PCR4, PCR7)
+        pcrs_before_reboot = node.tools[Tpm2].pcrread(pcrs=[4, 7])
+
+        # - Get current boot components versions (shim, systemd-boot, kernel-uki)
+        boot_components = ["shim", "systemd-boot", "kernel-uki"]
+        boot_components_versions = dict()
+        for pkg in boot_components:
+            pkg_info = posix_os.query_package(pkg)
+            boot_components_versions[pkg] = pkg_info.version_str
+
+        # - Upgrade boot components
+        posix_os.update_packages(boot_components)
+
+        # - Get new boot components versions
+        boot_components_new_versions = dict()
+        for pkg in boot_components:
+            pkg_info = posix_os.query_package(pkg)
+            boot_components_new_versions[pkg] = pkg_info.version_str
+
+        # Reboot
+        # - Make sure VM boots up again
+        reboot_tool = node.tools[Reboot]
+        reboot_tool.reboot_and_check_panic(log_path)
+        is_ready, tcp_error_code = wait_tcp_port_ready(
+            node.connection_info[constants.ENVIRONMENTS_NODES_REMOTE_ADDRESS],
+            node.connection_info[constants.ENVIRONMENTS_NODES_REMOTE_PORT],
+            log=log,
+        )
+        if not is_ready:
+            raise TcpConnectionException(
+                node.connection_info[constants.ENVIRONMENTS_NODES_REMOTE_ADDRESS],
+                node.connection_info[constants.ENVIRONMENTS_NODES_REMOTE_PORT],
+                tcp_error_code,
+                "no panic found in serial log",
+            )
+
+        pcrs_after_reboot = node.tools[Tpm2].pcrread(pcrs=[4, 7])
+        boot_component_changed = any(
+            boot_components_versions[pkg] != boot_components_new_versions[pkg]
+            for pkg in boot_components
+        )
+
+        # - PCR4 should change if any of the boot components is upgraded
+        # - PCR7 may change if a signing cert is changed
+        if boot_component_changed:
+            assert_that(
+                pcrs_after_reboot[4],
+                "PCR4 value is still the same even though a boot component changed",
+            ).is_not_equal_to(pcrs_before_reboot[4])
+            assert_warn(
+                pcrs_after_reboot[7],
+                "PCR7 changed after a boot component changed, this may happen if a"
+                " signing certificate was updated",
+            ).is_equal_to(pcrs_before_reboot[7])
+        else:
+            assert_that(
+                pcrs_after_reboot,
+                "PCR values changed even though no boot component was updated",
+            ).is_equal_to(pcrs_before_reboot)
