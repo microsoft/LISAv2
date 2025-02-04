@@ -3,12 +3,11 @@
 
 import itertools
 from pathlib import Path
-from typing import Any, List, cast
+from typing import Any, cast
 
 from assertpy.assertpy import assert_that, assert_warn
 
 from lisa import (
-    Environment,
     Logger,
     Node,
     RemoteNode,
@@ -23,7 +22,7 @@ from lisa.features.security_profile import (
 )
 from lisa.operating_system import CBLMariner, Posix
 from lisa.sut_orchestrator import AZURE
-from lisa.testsuite import TestResult, simple_requirement
+from lisa.testsuite import simple_requirement
 from lisa.tools import BootCtl, Lsblk, Reboot, Tpm2
 from lisa.tools.lsblk import PartitionInfo
 from lisa.util import (
@@ -62,14 +61,7 @@ class CVMBootTestSuite(TestSuite):
             supported_platform_type=[AZURE],
         ),
     )
-    def verify_encrypted_root_partition(
-        self,
-        log: Logger,
-        node: RemoteNode,
-        environment: Environment,
-        log_path: Path,
-        result: TestResult,
-    ) -> None:
+    def verify_encrypted_root_partition(self, node: RemoteNode) -> None:
         security_profile_settings = cast(
             SecurityProfileSettings, node.features[SecurityProfile].get_settings()
         )
@@ -107,13 +99,7 @@ class CVMBootTestSuite(TestSuite):
         ),
     )
     def verify_boot_success_after_component_upgrade(
-        self,
-        log: Logger,
-        node: RemoteNode,
-        environment: Environment,
-        log_path: Path,
-        result: TestResult,
-        **kwargs: Any,
+        self, log: Logger, node: RemoteNode, log_path: Path
     ) -> None:
         posix_os: Posix = cast(Posix, node.os)
         # First boot

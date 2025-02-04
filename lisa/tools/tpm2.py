@@ -27,8 +27,9 @@ class Tpm2(Tool):
         return self._check_exists()
 
     def pcrread(
-        self, alg: str = "sha256", pcrs: Optional[Union[int, Sequence[int]]] = None
+        self, pcrs: Optional[Union[int, Sequence[int]]] = None
     ) -> Dict[int, str]:
+        alg = "sha256"
         pcrs = self._get_pcr_list(pcrs)
         if len(pcrs) == 0:
             pcrs_arg = "all"
