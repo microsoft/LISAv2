@@ -1,6 +1,7 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT license.
 
+import itertools
 from pathlib import Path
 from typing import Any, List, cast
 
@@ -23,7 +24,7 @@ from lisa.features.security_profile import (
 from lisa.operating_system import CBLMariner, Posix
 from lisa.sut_orchestrator import AZURE
 from lisa.testsuite import TestResult, simple_requirement
-from lisa.tools import Lsblk, Reboot, Tpm2
+from lisa.tools import BootCtl, Lsblk, Reboot, Tpm2
 from lisa.tools.lsblk import PartitionInfo
 from lisa.util import (
     SkippedException,
@@ -74,13 +75,14 @@ class CVMBootTestSuite(TestSuite):
         )
         if not security_profile_settings.encrypt_disk:
             raise SkippedException("This test requires disk encryption to be enabled")
-        lsblk = node.tools[Lsblk]
-        disks = lsblk.get_disks(force_run=True)
-        partitions: List[PartitionInfo] = next(
-            (d.partitions for d in disks if d.name == "sda"), []
+
+        disks = node.tools[Lsblk].get_disks(force_run=True)
+        root_device = node.tools[BootCtl].get_root_device()
+        partitions = itertools.chain.from_iterable(disk.partitions for disk in disks)
+        root_partition = next(
+            (p for p in partitions if p.device_name == root_device), None
         )
-        assert_that(partitions, "Cannot find a disk named 'sda'").is_not_empty()
-        root_partition = next((p for p in partitions if p.name == "sda2"), None)
+
         assert_that(root_partition, "Cannot locate root partition").is_not_none()
         assert isinstance(root_partition, PartitionInfo)
         assert_that(root_partition.fstype).is_equal_to("crypto_LUKS")
