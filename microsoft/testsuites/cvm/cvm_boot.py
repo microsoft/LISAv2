@@ -3,7 +3,7 @@
 
 import itertools
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Dict, cast
 
 from assertpy.assertpy import assert_that, assert_warn
 
@@ -26,6 +26,7 @@ from lisa.testsuite import simple_requirement
 from lisa.tools import BootCtl, Lsblk, Reboot, Tpm2
 from lisa.tools.lsblk import PartitionInfo
 from lisa.util import (
+    LisaVersionInfo,
     SkippedException,
     TcpConnectionException,
     UnsupportedDistroException,
@@ -108,19 +109,19 @@ class CVMBootTestSuite(TestSuite):
 
         # - Get current boot components versions (shim, systemd-boot, kernel-uki)
         boot_components = ["shim", "systemd-boot", "kernel-uki"]
-        boot_components_versions = dict()
+        boot_components_versions: Dict[str, str] = dict()
         for pkg in boot_components:
-            pkg_info = posix_os.query_package(pkg)
-            boot_components_versions[pkg] = pkg_info.version_str
+            pkg_version = posix_os.get_package_information(pkg, use_cached=False)
+            boot_components_versions[pkg] = pkg_version.raw_version
 
         # - Upgrade boot components
         posix_os.update_packages(boot_components)
 
         # - Get new boot components versions
-        boot_components_new_versions = dict()
+        boot_components_new_versions: Dict[str, str] = dict()
         for pkg in boot_components:
-            pkg_info = posix_os.query_package(pkg)
-            boot_components_new_versions[pkg] = pkg_info.version_str
+            pkg_version = posix_os.get_package_information(pkg, use_cached=False)
+            boot_components_new_versions[pkg] = pkg_version.raw_version
 
         # Reboot
         # - Make sure VM boots up again
@@ -140,9 +141,8 @@ class CVMBootTestSuite(TestSuite):
             )
 
         pcrs_after_reboot = node.tools[Tpm2].pcrread(pcrs=[4, 7])
-        boot_component_changed = any(
-            boot_components_versions[pkg] != boot_components_new_versions[pkg]
-            for pkg in boot_components
+        boot_component_changed = (
+            boot_components_versions != boot_components_new_versions
         )
 
         # - PCR4 should change if any of the boot components is upgraded
