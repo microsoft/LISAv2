@@ -425,7 +425,7 @@ class LisaVersionInfo(VersionInfo):
 
     @classmethod
     def parse(cls, version: str) -> "LisaVersionInfo":
-        version_info = super().parse(version)
+        version_info = VersionInfo.parse(version)
         return LisaVersionInfo(version, version_info)
 
 

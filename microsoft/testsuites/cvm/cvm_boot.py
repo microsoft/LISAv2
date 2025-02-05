@@ -26,7 +26,6 @@ from lisa.testsuite import simple_requirement
 from lisa.tools import BootCtl, Lsblk, Reboot, Tpm2
 from lisa.tools.lsblk import PartitionInfo
 from lisa.util import (
-    LisaVersionInfo,
     SkippedException,
     TcpConnectionException,
     UnsupportedDistroException,
