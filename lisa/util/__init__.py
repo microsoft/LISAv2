@@ -426,7 +426,7 @@ class LisaVersionInfo(VersionInfo):
     @classmethod
     def parse(cls, version: str) -> "LisaVersionInfo":
         version_info = VersionInfo.parse(version)
-        return LisaVersionInfo(version, version_info)
+        return LisaVersionInfo(version, *version_info.to_tuple())
 
 
 def get_date_str(current: Optional[datetime] = None) -> str:
