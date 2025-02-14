@@ -128,7 +128,9 @@ class BinaryInstaller(BaseInstaller):
             )
         else:
             # Mariner 3.0 initrd
-            target = f"/boot/initramfs-{current_kernel}.img"
+            initramfs = f"/boot/initramfs-{new_kernel}.img"
+            dracut_cmd = f"dracut --quiet --force {initramfs} {new_kernel}"
+            node.execute(dracut_cmd, sudo=True, shell=True)
             link = f"/boot/initramfs-{new_kernel}.img"
 
             if isinstance(node.os, CBLMariner) and mariner_version == 2:
@@ -136,11 +138,11 @@ class BinaryInstaller(BaseInstaller):
                 target = f"/boot/initrd.img-{current_kernel}"
                 link = f"/boot/initrd.img-{new_kernel}"
 
-            ln = node.tools[Ln]
-            ln.create_link(
-                target=target,
-                link=link,
-            )
+                ln = node.tools[Ln]
+                ln.create_link(
+                    target=target,
+                    link=link,
+                )
 
         if kernel_config_path:
             # Copy kernel config
